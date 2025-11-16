@@ -1,26 +1,27 @@
-# Blackfire’s Build Island Library
+# Blackfire's Build Island Library
+A bunch of functions and stuff you can use to make scripts for Build Island!
 
-Functions n stuff for creating scripts for the Roblox game **Build Island**.
-
-## Load it by
+Load it with:
 ```lua
 loadstring(game:HttpGet('https://raw.githubusercontent.com/SolarSimulator/Build-Island-Library/refs/heads/main/main.lua'))()
 ```
 
-## Functions
+# Functions:
 
-### `GetRank(Player: Player?) → number`
-Returns the player’s rank.  
-If no player is provided, defaults to `LocalPlayer`.
+```lua
+GetRank(Player: Player)
+```
+Returns the rank of a player. Player defaults to LocalPlayer.
 
-### `GetBuildingArea(Player: Player?) → Model?`
-Returns the player’s **BuildingArea**.  
-May return `nil`.  
-Defaults to `LocalPlayer`.
+```lua
+GetBuildingArea(Player: Player)
+```
+Returns the BuildingArea belonging to a player (CAN RETURN NIL). Player defaults to LocalPlayer.
 
-### `Stamp(Block: string | number, Position: CFrame | Vector3, Size: Vector3) → Model`
-Places a block and returns the created model.
-**Args**
-- 1. **Block:** Block name or AssetId  
-- 2. **Position:** A `CFrame`, or a `Vector3` (auto-converted to `CFrame`)  
-- 3. **Size:** The size of the block
+```lua
+Stamp(Block: string/number, Position: CFrame/Vector3, Size: Vector3): Model
+```
+-# Places a block at a set position with a set size. Also returns the block.
+- Block: Can either be a block's name or a block's AssetId
+- Position: The CFrame the block will be placed at. If it's a Vector3, it will turn it into a CFrame.
+- Size: The size of the block
