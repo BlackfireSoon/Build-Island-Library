@@ -1,8 +1,8 @@
 # Blackfire’s Build Island Library
 
-Utilities for creating modkits for **Build Island**.
+Functions n stuff for creating scripts for the Roblox game **Build Island**.
 
-## Loading
+## Load it by
 ```lua
 loadstring(game:HttpGet('https://raw.githubusercontent.com/SolarSimulator/Build-Island-Library/refs/heads/main/main.lua'))()
 ```
