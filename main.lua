@@ -175,7 +175,7 @@ function Save()
 		code = table.concat({code, ...}, '') .. '\n'
 	end
 
-	local function configValueToString(v)
+	local function propertyValueToString(v)
 		if typeof(v) == 'Vector3' then
 			return 'Vector3.new('..tostring2(v)..')'
 		elseif typeof(v) == 'CFrame' then
@@ -218,9 +218,20 @@ function Save()
 					if config:IsA('ValueBase') then
 						local og = ogConfigFolder:FindFirstChild(config.Name)
 						if og and og.Value ~= config.Value then
-							write('Configure(a'..i..', \''..config.Name..'\', '..configValueToString(config.Value)..')')
+							write('Configure(a'..i..', \''..config.Name..'\', ' .. propertyValueToString(config.Value)..')')
 						end
 					end
+				end
+			end
+			
+			if block:FindFirstChild('Paint') then
+				local props = block.Paint
+				local paintProps = {}
+				for name, value in pairs(props) do
+					paintProps[#paintProps+1] = name..' = ' .. propertyValueToString(value)
+				end
+				if #paintProps > 0 then
+					write('Paint(a'..i..', {', table.concat(paintProps, ', '), '})')
 				end
 			end
 		end
