@@ -210,7 +210,7 @@ local function saveBlockProperties(block, ogBlock, i: number)
 		for k,v in pairs(props) do
 			paintProps[#paintProps+1] = k..' = '..propertyValueToString(v)
 		end
-		return 'Paint(a'..i..', {'..table.concat(paintProps, ', ')..'})'
+		return 'Paint(a' ..i.. ', {'..table.concat(paintProps, ', ')..'})'
 	end
 	return nil
 end
