@@ -20,7 +20,7 @@ local function assetIdsmatch(block: Model, assetId: number)
 	end
 end
 
-local function getBlock(name: string)
+function getBlock(name: string)
 	if type(name) == 'string' then
 		for i, folder in ipairs(StamperAssets:GetChildren()) do
 			for i, block: Model in ipairs(folder:GetChildren()) do
