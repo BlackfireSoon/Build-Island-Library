@@ -3,7 +3,7 @@ A bunch of functions and stuff you can use to make scripts for Build Island!
 
 Load it with:
 ```lua
-loadstring(game:HttpGet('https://raw.githubusercontent.com/SolarSimulator/Build-Island-Library/refs/heads/main/main.lua'))()
+loadstring(game:HttpGet('https://raw.githubusercontent.com/BlackfireSoon/Build-Island-Library/refs/heads/main/main.lua'))()
 ```
 
 # Functions:
