@@ -20,6 +20,22 @@ local function assetIdsmatch(block: Model, assetId: number)
 	end
 end
 
+function Activate(WiringBlock: Model)
+	local AssetId = WiringBlock.AssetId.Value
+	local Primary = WiringBlock.PrimaryPart
+	local Input = 'Input'
+	
+	if AssetId == 129130944361 then
+		Input = 'Run'
+	end
+	
+	local Core = Stamp('Inverter Gate')
+	Wire({Core, 'Output'}, {WiringBlock, Input})
+	
+	task.wait(.1)
+	Delete(Core)
+end
+
 function getBlock(name: string)
 	if type(name) == 'string' then
 		for i, folder in ipairs(StamperAssets:GetChildren()) do
