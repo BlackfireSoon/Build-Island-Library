@@ -1,0 +1,552 @@
+-- ============================================================
+--  BLF Script Interpreter
+--  Supports: numbers, strings, variables, events, math ops,
+--            player refs, kill, exec, wait, print, and more
+-- ============================================================
+
+local generatedBlocks = {}   -- name -> block (for variable/string editors)
+local allBlocks = {}         -- all blocks for cleanup
+local blockOffset = 0
+
+local function nextPosition(zOffset)
+	local pos = CFrame.new(0, 0, (blockOffset + (zOffset or 0)) * 6)
+	blockOffset += 1
+	return pos
+end
+
+local function track(block)
+	table.insert(allBlocks, block)
+	return block
+end
+
+-- ============================================================
+--  Type helpers
+-- ============================================================
+
+local function isString(val)
+	return val:match('^".*"$') or val:match("^'.*'$")
+end
+
+local function isNumber(val)
+	return tonumber(val) ~= nil
+end
+
+local function stripQuotes(val)
+	return val:match('^["\'](.+)["\']$') or val
+end
+
+-- Resolve a value: could be a number literal, string literal,
+-- or a variable reference (returns the <%name> template if it's a known var)
+local function resolveValue(val)
+	val = val:match("^%s*(.-)%s*$")
+	if isNumber(val) then
+		return tonumber(val), "number"
+	elseif isString(val) then
+		return stripQuotes(val), "string"
+	elseif generatedBlocks[val] then
+		return val, "variable"  -- known variable name
+	else
+		return val, "unknown"
+	end
+end
+
+-- ============================================================
+--  Variable declaration / assignment
+--  local x = 50
+--  local x = "hello"
+--  local x = playerName   (player reference)
+-- ============================================================
+
+local function handleVariableDecl(name, val, mode)
+	mode = mode or "Set"
+	local resolved, vtype = resolveValue(val)
+
+	local blockName = (vtype == "string") and "String Editor" or "Variable Editor"
+	local block = track(Stamp(blockName, nextPosition(), Vector3.new(4,4,4)))
+
+	Configure(block, "Variable Name", name)
+	Configure(block, "Mode", mode)
+
+	if vtype == "number" then
+		Configure(block, "Value", resolved)
+	elseif vtype == "string" then
+		Configure(block, "Value", resolved)
+	elseif vtype == "variable" then
+		-- Use Variable To Variable Editor for var = otherVar
+		Delete(block)
+		table.remove(allBlocks)
+		block = track(Stamp("Variable To Variable Editor", nextPosition(), Vector3.new(4,4,4)))
+		Configure(block, "Variable Name", name)
+		Configure(block, "Mode", mode)
+		Configure(block, "Value", resolved)  -- the OTHER variable's name
+	end
+
+	Activate(block)
+	generatedBlocks[name] = block
+	return block
+end
+
+-- ============================================================
+--  Math assignment ops:  x += 5  |  x -= 2  |  x *= 3  etc.
+-- ============================================================
+
+local mathOpModes = {
+	['+='] = 'Increment',
+	['-='] = 'Increment',  -- negative value
+	['*='] = 'Multiply',
+	['/='] = 'Divide',
+}
+
+local function handleMathAssign(name, op, val)
+	local resolved, vtype = resolveValue(val)
+	local mode = mathOpModes[op]
+	local existing = generatedBlocks[name]
+
+	local block
+	if vtype == "variable" then
+		block = track(Stamp("Variable To Variable Editor", nextPosition(), Vector3.new(4,4,4)))
+		Configure(block, "Variable Name", name)
+		Configure(block, "Mode", mode)
+		Configure(block, "Value", resolved)
+	else
+		block = track(Stamp("Variable Editor", nextPosition(), Vector3.new(4,4,4)))
+		Configure(block, "Variable Name", name)
+		Configure(block, "Mode", mode)
+		-- For -= we negate
+		if op == '-=' then
+			Configure(block, "Value", -(resolved))
+		else
+			Configure(block, "Value", resolved)
+		end
+	end
+
+	Activate(block)
+	generatedBlocks[name] = block
+end
+
+-- ============================================================
+--  String operations:  strVar:add("!!")  strVar:upper()  etc.
+-- ============================================================
+
+local stringMethods = {
+	add = "Add",
+	lower = "Lower",
+	upper = "Upper",
+	reverse = "Reverse",
+	set = "Set",
+}
+
+local function handleStringOp(name, method, arg)
+	local mode = stringMethods[method:lower()] or "Set"
+	local block = track(Stamp("String Editor", nextPosition(), Vector3.new(4,4,4)))
+	Configure(block, "Variable Name", name)
+	Configure(block, "Mode", mode)
+	if arg then
+		Configure(block, "Value", stripQuotes(arg))
+	end
+	Activate(block)
+	generatedBlocks[name] = block
+end
+
+-- ============================================================
+--  Variable toggle / random
+-- ============================================================
+
+local function handleToggle(name)
+	local block = track(Stamp("Variable Editor", nextPosition(), Vector3.new(4,4,4)))
+	Configure(block, "Variable Name", name)
+	Configure(block, "Mode", "Bool Toggle")
+	Activate(block)
+	generatedBlocks[name] = block
+end
+
+local function handleRandom(name, maxVal)
+	local block = track(Stamp("Variable Editor", nextPosition(), Vector3.new(4,4,4)))
+	Configure(block, "Variable Name", name)
+	Configure(block, "Mode", "Random")
+	Configure(block, "Value", tonumber(maxVal) or 100)
+	Activate(block)
+	generatedBlocks[name] = block
+end
+
+-- ============================================================
+--  Command block helper
+-- ============================================================
+
+local function makeCommandBlock(cmd)
+	local block = track(Stamp("Command Block", nextPosition(), Vector3.new(4,4,4)))
+	Configure(block, "Command", cmd)
+	Activate(block)
+	return block
+end
+
+-- ============================================================
+--  print(x) / print("hello")
+-- ============================================================
+
+local function handlePrint(arg)
+	arg = arg:match("^%s*(.-)%s*$")
+	local resolved, vtype = resolveValue(arg)
+	local msg
+	if vtype == "variable" then
+		msg = ";notice all BLF: <%" .. resolved .. ">"
+	elseif vtype == "string" then
+		msg = ";notice all BLF: " .. resolved
+	else
+		msg = ";notice all BLF: " .. tostring(resolved)
+	end
+	makeCommandBlock(msg)
+end
+
+-- ============================================================
+--  warn(x)  -- red notice
+-- ============================================================
+
+local function handleWarn(arg)
+	arg = arg:match("^%s*(.-)%s*$")
+	local resolved, vtype = resolveValue(arg)
+	local msg
+	if vtype == "variable" then
+		msg = ";notifyme BLF WARN: <%" .. resolved .. ">"
+	else
+		msg = ";notifyme BLF WARN: " .. stripQuotes(tostring(resolved))
+	end
+	makeCommandBlock(msg)
+end
+
+-- ============================================================
+--  exec("some hd admin command")
+-- ============================================================
+
+local function handleExec(raw)
+	local cmd = stripQuotes(raw:match("^%s*(.-)%s*$"))
+	makeCommandBlock(cmd)
+end
+
+-- ============================================================
+--  kill(player)
+-- ============================================================
+
+local function handleKill(playerArg)
+	playerArg = playerArg:match("^%s*(.-)%s*$")
+	local target
+	if playerArg == "me" or playerArg == "local" or playerArg == "LocalPlayer" then
+		target = game.Players.LocalPlayer.Name
+	elseif isString(playerArg) then
+		target = stripQuotes(playerArg)
+	elseif generatedBlocks[playerArg] then
+		-- It's a variable holding a player name — use template
+		target = "<%" .. playerArg .. ">"
+	else
+		target = playerArg
+	end
+	makeCommandBlock(";kill " .. target)
+end
+
+-- ============================================================
+--  kick(player, reason)
+-- ============================================================
+
+local function handleKick(args)
+	local player, reason = args:match("^(.-),%s*(.+)$")
+	if not player then player = args; reason = "Kicked" end
+	player = player:match("^%s*(.-)%s*$")
+	local target = generatedBlocks[player] and ("<%" .. player .. ">") or stripQuotes(player)
+	makeCommandBlock(";kick " .. target .. " " .. stripQuotes(reason))
+end
+
+-- ============================================================
+--  speed(player, value)  / jump(player, value)
+-- ============================================================
+
+local function handleSpeed(args)
+	local player, val = args:match("^(.-),%s*(.+)$")
+	if not player then return end
+	local target = generatedBlocks[player] and ("<%" .. player .. ">") or stripQuotes(player)
+	makeCommandBlock(";speed " .. target .. " " .. val)
+end
+
+local function handleJump(args)
+	local player, val = args:match("^(.-),%s*(.+)$")
+	if not player then return end
+	local target = generatedBlocks[player] and ("<%" .. player .. ">") or stripQuotes(player)
+	makeCommandBlock(";jumppower " .. target .. " " .. val)
+end
+
+-- ============================================================
+--  teleport(player, x, y, z)
+-- ============================================================
+
+local function handleTeleport(args)
+	local player, coords = args:match("^(.-),%s*(.+)$")
+	if not player then return end
+	local target = generatedBlocks[player] and ("<%" .. player .. ">") or stripQuotes(player)
+	makeCommandBlock(";bring " .. target)  -- closest available in hd admin
+end
+
+-- ============================================================
+--  wait(n)
+-- ============================================================
+
+local function handleWait(n)
+	task.wait(tonumber(n) or 1)
+end
+
+-- ============================================================
+--  EVENT LISTENER
+--  on("EventName", function()
+--    ...body...
+--  end)
+--
+--  Supported events (Build Island detector blocks):
+--    "PlayerAdded", "PlayerRemoving", "Touched",
+--    "ChatMessage", "PlayerDied", "ValueChanged"
+-- ============================================================
+
+local eventBlockMap = {
+	playeradded   = "Player Added Detector",
+	playerremoving= "Player Removing Detector",
+	touched       = "Touch Detector",
+	chatmessage   = "Chat Detector",
+	playerdied    = "Death Detector",
+	valuechanged  = "Variable Changed Detector",
+	clicked       = "Click Detector",
+	timerended    = "Timer Ended Detector",
+}
+
+-- Forward declare so body lines can be parsed recursively
+local parseLine
+
+local function handleEvent(eventName, bodyLines)
+	local key = eventName:lower():gsub('["\' ]','')
+	local detectorName = eventBlockMap[key]
+
+	if not detectorName then
+		warn("Unknown event: " .. eventName)
+		return
+	end
+
+	-- Place the detector
+	local detector = track(Stamp(detectorName, nextPosition(), Vector3.new(4,4,4)))
+
+	-- Place each body block and wire detector's Output -> block's Input
+	for _, bodyLine in ipairs(bodyLines) do
+		bodyLine = bodyLine:match("^%s*(.-)%s*$")
+		if bodyLine ~= "" then
+			local prevOffset = blockOffset
+			parseLine(bodyLine)  -- this stamps+activates the block
+			-- Wire detector to the last placed block
+			local lastBlock = allBlocks[#allBlocks]
+			if lastBlock then
+				Wire({detector, "Output"}, {lastBlock, "Input"})
+			end
+		end
+	end
+end
+
+-- ============================================================
+--  IF statement (basic single-condition)
+--  if varName == value then
+--    ...
+--  end
+-- ============================================================
+
+local comparisonOps = {
+	['=='] = 'Equal',
+	['~='] = 'Not Equal',
+	['!='] = 'Not Equal',
+	['>='] = 'Greater Than Or Equal',
+	['<='] = 'Less Than Or Equal',
+	['>']  = 'Greater Than',
+	['<']  = 'Less Than',
+}
+
+local function handleIf(condition, bodyLines)
+	-- Parse: varName op value
+	local varName, op, val = condition:match("^(%w+)%s*([><=!~]+)%s*(.+)$")
+	if not varName then return end
+
+	local compMode = comparisonOps[op] or 'Equal'
+	local resolved, vtype = resolveValue(val)
+
+	local checker = track(Stamp("Variable Checker", nextPosition(), Vector3.new(4,4,4)))
+	Configure(checker, "Variable Name", varName)
+	Configure(checker, "Comparison", compMode)
+	if vtype == "number" then
+		Configure(checker, "Value", resolved)
+	else
+		Configure(checker, "Value", tostring(resolved))
+	end
+
+	-- Body blocks wired to checker's "True" output
+	for _, bodyLine in ipairs(bodyLines) do
+		bodyLine = bodyLine:match("^%s*(.-)%s*$")
+		if bodyLine ~= "" then
+			parseLine(bodyLine)
+			local lastBlock = allBlocks[#allBlocks]
+			if lastBlock then
+				Wire({checker, "True"}, {lastBlock, "Input"})
+			end
+		end
+	end
+
+	Activate(checker)
+end
+
+-- ============================================================
+--  MAIN LINE PARSER
+-- ============================================================
+
+-- Multi-line block collectors
+local inEvent = false
+local eventName = nil
+local eventBody = {}
+
+local inIf = false
+local ifCondition = nil
+local ifBody = {}
+
+parseLine = function(line)
+	line = line:match("^%s*(.-)%s*$")
+	if line == "" or line:sub(1,2) == "--" then return end
+
+	-- ── Multi-line: event body collection ──
+	if inEvent then
+		if line == "end)" or line == "end" then
+			handleEvent(eventName, eventBody)
+			inEvent = false; eventName = nil; eventBody = {}
+		else
+			table.insert(eventBody, line)
+		end
+		return
+	end
+
+	-- ── Multi-line: if body collection ──
+	if inIf then
+		if line == "end" then
+			handleIf(ifCondition, ifBody)
+			inIf = false; ifCondition = nil; ifBody = {}
+		else
+			table.insert(ifBody, line)
+		end
+		return
+	end
+
+	-- ── on("Event", function() ──
+	local evName = line:match('^on%((.-),%s*function%(%)')
+	if evName then
+		inEvent = true
+		eventName = stripQuotes(evName)
+		eventBody = {}
+		return
+	end
+
+	-- ── if condition then ──
+	local ifCond = line:match('^if%s+(.+)%s+then$')
+	if ifCond then
+		inIf = true
+		ifCondition = ifCond
+		ifBody = {}
+		return
+	end
+
+	-- ── local x = 50 / local x = "hi" ──
+	local name, val = line:match('^local%s+(%w+)%s*=%s*(.+)$')
+	if name then
+		handleVariableDecl(name, val)
+		return
+	end
+
+	-- ── x:upper() / x:add("!") / x:set("new") ──
+	local svar, smethod, sarg = line:match('^(%w+):(%w+)%((.*)%)$')
+	if svar and smethod and stringMethods[smethod:lower()] then
+		handleStringOp(svar, smethod, sarg ~= "" and sarg or nil)
+		return
+	end
+
+	-- ── x += 5  /  x -= 3  /  x *= 2  /  x /= 4 ──
+	local mname, mop, mval = line:match('^(%w+)%s*([%+%-%*%/]=)%s*(.+)$')
+	if mname and mop and mval then
+		handleMathAssign(mname, mop, mval)
+		return
+	end
+
+	-- ── toggle(x) ──
+	local togVar = line:match('^toggle%((%w+)%)$')
+	if togVar then handleToggle(togVar); return end
+
+	-- ── random(x, max) ──
+	local rndVar, rndMax = line:match('^random%((%w+),%s*(%d+)%)$')
+	if rndVar then handleRandom(rndVar, rndMax); return end
+
+	-- ── x = val  (reassignment) ──
+	local rname, rval = line:match('^(%w+)%s*=%s*(.+)$')
+	if rname and rval and not line:find('^local') then
+		if generatedBlocks[rname] then
+			-- Reconfigure existing block
+			local resolved, vtype = resolveValue(rval)
+			Configure(generatedBlocks[rname], "Mode", "Set")
+			Configure(generatedBlocks[rname], "Value", resolved)
+			Activate(generatedBlocks[rname])
+		else
+			handleVariableDecl(rname, rval)
+		end
+		return
+	end
+
+	-- ── print(x) ──
+	local printArg = line:match('^print%((.-)%)$')
+	if printArg then handlePrint(printArg); return end
+
+	-- ── warn(x) ──
+	local warnArg = line:match('^warn%((.-)%)$')
+	if warnArg then handleWarn(warnArg); return end
+
+	-- ── exec("cmd") ──
+	local execArg = line:match('^exec%((.+)%)$')
+	if execArg then handleExec(execArg); return end
+
+	-- ── kill(player) ──
+	local killArg = line:match('^kill%((.-)%)$')
+	if killArg then handleKill(killArg); return end
+
+	-- ── kick(player, reason) ──
+	local kickArg = line:match('^kick%((.+)%)$')
+	if kickArg then handleKick(kickArg); return end
+
+	-- ── speed(player, val) ──
+	local speedArg = line:match('^speed%((.+)%)$')
+	if speedArg then handleSpeed(speedArg); return end
+
+	-- ── jump(player, val) ──
+	local jumpArg = line:match('^jump%((.+)%)$')
+	if jumpArg then handleJump(jumpArg); return end
+
+	-- ── teleport(player, x, y, z) ──
+	local tpArg = line:match('^teleport%((.+)%)$')
+	if tpArg then handleTeleport(tpArg); return end
+
+	-- ── wait(n) ──
+	local waitN = line:match('^wait%((.-)%)$')
+	if waitN then handleWait(waitN); return end
+
+	warn("[BLF Interpreter] Unrecognized line: " .. line)
+end
+
+-- ============================================================
+--  RUN
+-- ============================================================
+
+function runScript(code)
+	-- Reset state
+	generatedBlocks = {}
+	allBlocks = {}
+	blockOffset = 0
+	inEvent = false; eventName = nil; eventBody = {}
+	inIf = false; ifCondition = nil; ifBody = {}
+
+	local lines = code:gsub('\r\n', '\n'):gsub(';', '\n'):split('\n')
+	for _, line in ipairs(lines) do
+		parseLine(line)
+	end
+end
