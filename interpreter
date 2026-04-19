@@ -35,6 +35,16 @@ local function stripQuotes(val)
 	return val:match('^["\'](.+)["\']$') or val
 end
 
+-- Safe stamp with error reporting
+local function safeStamp(name, pos, size)
+    local block = Stamp(name, pos, size)
+    if not block then
+        warn("[BLF] Failed to stamp block: '" .. tostring(name) .. "' — check exact name in StamperAssets")
+        return nil
+    end
+    return block
+end
+
 -- Resolve a value: could be a number literal, string literal,
 -- or a variable reference (returns the <%name> template if it's a known var)
 local function resolveValue(val)
@@ -58,32 +68,30 @@ end
 -- ============================================================
 
 local function handleVariableDecl(name, val, mode)
-	mode = mode or "Set"
-	local resolved, vtype = resolveValue(val)
+    mode = mode or "Set"
+    local resolved, vtype = resolveValue(val)
 
-	local blockName = (vtype == "string") and "String Editor" or "Variable Editor"
-	local block = track(Stamp(blockName, nextPosition(), Vector3.new(4,4,4)))
+    local blockName = (vtype == "string") and "String Editor" or "Variable Editor"
+    local block = safeStamp(blockName, nextPosition(), Vector3.new(4,4,4))
+    if not block then return end  -- ← guard
 
-	Configure(block, "Variable Name", name)
-	Configure(block, "Mode", mode)
+    Configure(block, "Variable Name", name)
+    Configure(block, "Mode", mode)
+    Configure(block, "Value", (vtype == "number" or vtype == "string") and resolved or tostring(resolved))
 
-	if vtype == "number" then
-		Configure(block, "Value", resolved)
-	elseif vtype == "string" then
-		Configure(block, "Value", resolved)
-	elseif vtype == "variable" then
-		-- Use Variable To Variable Editor for var = otherVar
-		Delete(block)
-		table.remove(allBlocks)
-		block = track(Stamp("Variable To Variable Editor", nextPosition(), Vector3.new(4,4,4)))
-		Configure(block, "Variable Name", name)
-		Configure(block, "Mode", mode)
-		Configure(block, "Value", resolved)  -- the OTHER variable's name
-	end
+    if vtype == "variable" then
+        Delete(block)
+        table.remove(allBlocks)
+        block = safeStamp("Variable To Variable Editor", nextPosition(), Vector3.new(4,4,4))
+        if not block then return end
+        Configure(block, "Variable Name", name)
+        Configure(block, "Mode", mode)
+        Configure(block, "Value", resolved)
+    end
 
-	Activate(block)
-	generatedBlocks[name] = block
-	return block
+    track(block)
+    Activate(block)
+    generatedBlocks[name] = block
 end
 
 -- ============================================================
