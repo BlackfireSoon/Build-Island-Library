@@ -29,6 +29,36 @@ Stamp(Block: string/number, Position: CFrame/Vector3, Size: Vector3): Model
 - Size: The size of the block
 
 ```lua
+Delete(Block: Model)
+```
+↑ Deletes a block.
+- Block: Needs to be a block inside of a player's BuildingArea, or one returned from the Stamp function.
+
+```lua
+Configure(Block: Model, ConfigName: string, Value: any)
+```
+↑ Sets the property of a block to a specific value.
+- Block: Needs to be a block inside of a player's BuildingArea, or one returned from the Stamp function.
+- ConfigName: The name of the property to be changed
+- Value: The value to set the property
+
+```lua
+Wire(OutputInfo: {Block: Model, OutputName: string}, InputInfo: {Block: Model, InputName: string})
+```
+↑ Wires a block's output to a blocks' input.
+- OutputInfo.Block: Needs to be a block inside of a player's BuildingArea, or one returned from the Stamp function.
+- OutputInfo.OutputName: The name of the output to be wired
+- OutputInfo.Block: Needs to be a block inside of a player's BuildingArea, or one returned from the Stamp function.
+- OutputInfo.InputName: The name of the input to be wired
+
+```lua
+Paint(Block: Model, Properties: {[string]: any})
+```
+↑ Changes the appearance of the block's PrimaryPart
+- Block: Needs to be a block inside of a player's BuildingArea, or one returned from the Stamp function.
+- Properties: Color, Anchored, Transparency, CanCollide, etc.
+
+```lua
 Save()
 ```
 ↑ Sets all your blocks information as Stamp(), Paint(), and Config() functions to your clipboard. This does not save wiring.
