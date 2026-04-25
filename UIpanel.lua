@@ -190,13 +190,16 @@ return function(input)
         end
     end)
 
+    function Save()
+	loadstring(game:HttpGet('https://raw.githubusercontent.com/BlackfireSoon/Build-Island-Library/refs/heads/main/savebuild.lua'))()
+end
+
     SaveBtn.MouseButton1Click:Connect(function()
         if getgenv().Save then
             getgenv().Save()
         else
             -- Fallback in case globals aren't passing cleanly
-            local success, runErr = pcall(function() loadstring("Save()")() end)
-            if not success then warn("Save failed: " .. tostring(runErr)) end
+            Save()
         end
     end)
 
