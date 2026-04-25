@@ -255,57 +255,5 @@ local function saveBlockProperties(block, ogBlock, i: number)
 end
 
 function Save()
-	loadstring(game:HttpGet('https://raw.githubusercontent.com/SolarSimulator/Build-Island-Library/refs/heads/main/main.lua'))()
-
-	local BuildingArea = GetBuildingArea()
-	local PlayerArea = BuildingArea.PlayerArea
-	local code = [[]]
-
-	local function write(...)
-		code = table.concat({code, ...}, '') .. '\n'
-	end
-
-	for i, block in ipairs(PlayerArea:GetChildren()) do
-		local AssetId = block:FindFirstChild('AssetId')
-		if AssetId then
-			AssetId = AssetId.Value
-
-			local part = block.PrimaryPart or block:FindFirstChildWhichIsA('BasePart')
-			local ogBlock = getBlock(AssetId)
-			local ogPart = ogBlock.PrimaryPart or ogBlock:FindFirstChildWhichIsA('BasePart')
-
-			local size
-			if part and ogPart and part.Size ~= ogPart.Size then
-				size = part.Size
-			end
-
-			if size then
-				write('a', i, ' = ', 'Stamp(', AssetId, ', CFrame.new(', tostring2(block:GetPivot()), '), Vector3.new(', tostring2(size), '))')
-			else
-				write('a', i, ' = ', 'Stamp(', AssetId, ', CFrame.new(', tostring2(block:GetPivot()), '))')
-			end
-
-			local configFolder = FindFirstDescendant(block, 'Configuration')
-			local ogConfigFolder = FindFirstDescendant(ogBlock, 'Configuration')
-			if configFolder and ogConfigFolder then
-				for _, config in ipairs(configFolder:GetChildren()) do
-					if config:IsA('ValueBase') then
-						local og = ogConfigFolder:FindFirstChild(config.Name)
-						if og and og.Value ~= config.Value then
-							write('Configure(a'..i..', \'' .. config.Name..'\', ' .. propertyValueToString(config.Value)..')')
-						end
-					end
-				end
-			end
-
-			local paintLine = saveBlockProperties(block, ogBlock, i)
-			if paintLine then
-				write(paintLine)
-			end
-
-		end
-	end
-
-	setclipboard(code)
-	print(code)
+	loadstring(game:HttpGet('https://raw.githubusercontent.com/BlackfireSoon/Build-Island-Library/refs/heads/main/savebuild.lua'))()
 end
