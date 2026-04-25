@@ -20,12 +20,24 @@ local function assetIdsmatch(block: Model, assetId: number)
 	end
 end
 
+
+local BlockIds = {
+	Block = 56453012,
+	['Mesh Block'] = 23244000,
+	['Decal Block'] = 14756072747,
+}
+
 function getBlock(name: string)
 	if type(name) == 'string' then
+		if BlockIds[name] then
+			return BlockIds[name]
+		end
 		for i, folder in ipairs(StamperAssets:GetChildren()) do
 			for i, block: Model in ipairs(folder:GetChildren()) do
 				if (standard(block.Name) == standard(name)) and (block:FindFirstChild('AssetId')) then
-					return block:FindFirstChild('AssetId').Value
+					local AssetId = block:FindFirstChild('AssetId').Value
+					BlockIds[name] = AssetId
+					return AssetId
 				end
 			end
 		end
