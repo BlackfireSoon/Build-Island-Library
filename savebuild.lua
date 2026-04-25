@@ -398,6 +398,12 @@ return function()
 
 	-- ===================== SPLIT INTO 200KB CHUNKS =====================
 
+	pcall(function()
+		setclipboard(
+			table.concat(lines, '\n')
+		)
+	end)
+	
 	local chunks = {}
 	local currentChunk = ''
 
@@ -418,8 +424,9 @@ return function()
 	end
 
 	-- ===================== BUILD GUI =====================
-
-	local PlayerGui = game.StarterGui
+	
+	local LocalPlayer = game.Players.LocalPlayer
+	local PlayerGui = LocalPlayer and game:GetService('CoreGui') or game.StarterGui
 	local existing  = PlayerGui:FindFirstChild('BuildExporterGui')
 	if existing then existing:Destroy() end
 
